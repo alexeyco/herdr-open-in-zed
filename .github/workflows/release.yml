@@ -25,8 +25,17 @@ jobs:
           grep -qx "version = \"$tag\"" Cargo.toml || { echo "tag $tag != Cargo.toml version"; exit 1; }
           grep -qx "version = \"$tag\"" herdr-plugin.toml || { echo "tag $tag != herdr-plugin.toml version"; exit 1; }
 
-  release:
+  create-release:
     needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    needs: create-release
     strategy:
       matrix:
         include:
@@ -43,9 +52,6 @@ jobs:
         with:
           target: ${{ matrix.target }}
           cache-key: ${{ matrix.target }}
-      - uses: taiki-e/create-gh-release-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: herdr-open-in-zed
