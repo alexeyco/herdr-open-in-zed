@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify tag matches crate and plugin versions
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          grep -qx "version = \"$tag\"" Cargo.toml || { echo "tag $tag != Cargo.toml version"; exit 1; }
+          grep -qx "version = \"$tag\"" herdr-plugin.toml || { echo "tag $tag != herdr-plugin.toml version"; exit 1; }
+
+  release:
+    needs: verify
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@1.96.1
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: herdr-open-in-zed
+          target: ${{ matrix.target }}
+          locked: true
+          checksum: sha256
+          include: LICENSE,README.md,herdr-plugin.toml
+          token: ${{ secrets.GITHUB_TOKEN }}
